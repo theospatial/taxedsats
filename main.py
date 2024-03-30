@@ -1,4 +1,6 @@
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 """
 cash_csv_path = '~/tax_csv/txn_csv/cash_app_report_btc.csv'
 t21_csv_path = '~/tax_csv/txn_csv/transactions21.csv'
@@ -83,7 +85,6 @@ df_f22['Category'] = df_f22.apply(categorize_transaction, axis=1)
 
 ###chart diagnostics
 """"""
-import matplotlib.pyplot as plt
 
 df_cash['Amount'].hist(bins=50)
 plt.title('Distribution of Amount')
@@ -116,7 +117,6 @@ plt.show()
 
 
 
-import seaborn as sns
 
 plt.figure(figsize=(10, 6))
 sns.heatmap(df_cash.isnull(), cbar=False, cmap='viridis')
@@ -124,7 +124,6 @@ plt.title('Heatmap of Missing Data')
 plt.show()
 """
 """
-import matplotlib.pyplot as plt
 
 df_t21['Category'].value_counts().plot(kind='bar')
 plt.title('Category')
@@ -138,7 +137,6 @@ plt.xlabel('Type')
 plt.ylabel('Frequency')
 plt.show()
 
-import seaborn as sns
 
 plt.figure(figsize=(10, 6))
 sns.heatmap(df_t21.isnull(), cbar=False, cmap='viridis')
@@ -146,7 +144,6 @@ plt.title('Heatmap of Missing Data')
 plt.show()
 """"""
 
-import matplotlib.pyplot as plt
 
 df_f22['Category'].value_counts().plot(kind='bar')
 plt.title('Category')
@@ -159,8 +156,6 @@ plt.title('Transaction Types')
 plt.xlabel('Type')
 plt.ylabel('Frequency')
 plt.show()
-
-import seaborn as sns
 
 plt.figure(figsize=(10, 6))
 sns.heatmap(df_f22.isnull(), cbar=False, cmap='viridis')
@@ -176,6 +171,12 @@ plt.show()
 #print(df_cash[df_cash['Notes'] == "#CashAppBitcoin 🐝🍵🌊"])
 """
 
+def plot_source_distribution(df, title_suffix):
+    source_counts = df['Source'].value_counts()
+    source_counts.plot(kind='pie', autopct='%1.1f%%', startangle=90, title=f'Distribution of Transactions by Source for {title_suffix}')
+    plt.ylabel('')  # Hide the y-label for clarity
+    plt.show()
+
 def load_and_preprocess(csv_path):
     df = pd.read_csv(csv_path)
     df['Date'] = df['Date'].str.slice(stop=-4)  # Assuming the timezone abbreviation is always 3 characters long, preceded by a space
@@ -190,10 +191,31 @@ def load_and_preprocess(csv_path):
     return df
 
 csv_paths = {
-    'cash_app': '~/tax_csv/txn_csv/cash_app_report_btc.csv',
-    'transactions_21': '~/tax_csv/txn_csv/transactions21.csv',
-    'fold_app_22': '~/tax_csv/txn_csv/fold_app_report_2022.csv'
+    'cash_app_22': '~/tax_csv/txn_csv/cash_app_report_btc.csv',
+    'cash_app_21': '~/tax_csv/txn_csv/transactions21.csv',
+    'fold_app_22': '~/tax_csv/txn_csv/fold_app_report_2022.csv',
+    'swan_app_22': '~/tax_csv/txn_csv/swan_app_report_2022.csv'
 }
+print("TESTING DUPLICATES")
+# Load CSV files
+df1 = pd.read_csv(csv_paths['cash_app_22'])
+df2 = pd.read_csv(csv_paths['cash_app_21'])
+
+# Combine the DataFrames
+combined_df = pd.concat([df1, df2])
+
+# Identify duplicates based on 'Transaction ID'
+duplicates = combined_df[combined_df.duplicated(subset='Transaction ID', keep=False)]
+
+# Show duplicates
+print(duplicates)
+duplicates_by_id = combined_df[combined_df.duplicated(subset='Transaction ID', keep=False)]
+print("Duplicates based on Transaction ID:\n", duplicates_by_id)
+duplicates_by_amount = combined_df[combined_df.duplicated(subset='Asset Amount', keep=False)]
+print("Duplicates based on Asset Amount:\n", duplicates_by_amount)
+
+print("END OF TEST")
+
 
 dataframes = []
 for source, path in csv_paths.items():
@@ -225,11 +247,10 @@ def categorize_transaction(row):
 
 unified_ledger['Category'] = unified_ledger.apply(categorize_transaction, axis=1)
 
-"""
+
 #diagnostics and visualizations:
 print(unified_ledger.head())
 
-import matplotlib.pyplot as plt
 
 unified_ledger['Date'].value_counts().sort_index().plot(kind='line')
 plt.title('Transaction Volume Over Time')
@@ -255,8 +276,7 @@ plt.xlabel('Date')
 plt.ylabel('Asset Price')
 plt.show()
 
-import seaborn as sns
-
+"""
 # Select only numeric columns for correlation matrix
 numeric_cols = unified_ledger.select_dtypes(include=['float64', 'int64'])
 correlation_matrix = numeric_cols.corr()
@@ -275,7 +295,6 @@ plt.xlabel('Date')
 plt.ylabel('Amount')
 plt.show()
 
-import seaborn as sns
 
 plt.figure(figsize=(10, 6))
 sns.heatmap(unified_ledger.isnull(), cbar=False, cmap='viridis')
@@ -506,7 +525,8 @@ def assign_gain_loss(unified_ledger):
                     'Used Amount': used_amount,
                     'Cost Basis': cost_basis_for_this_amount,
                     'Sale Proceeds': used_amount * sale_price,
-                    'Gain/Loss': gain_loss
+                    'Gain/Loss': gain_loss,
+                    'Source': transaction['Source']
                 })
 
 
@@ -521,7 +541,8 @@ def assign_gain_loss(unified_ledger):
                 'Date Acquired': transaction['Date'],
                 'Remaining Amount': transaction['Asset Amount'],
                 'Cost Basis per Unit': transaction['Asset Price'],
-                'Category': transaction['Category']
+                'Category': transaction['Category'],
+                'Source': transaction['Source']
             })
             
             if transaction['Category'] == 'Receives':
@@ -530,8 +551,9 @@ def assign_gain_loss(unified_ledger):
                 tax_ledger.append({
                     'Date': transaction['Date'],
                     'Type': 'Income',
-                    'Category': 'Cryptocurrency',
-                    'Amount': income
+                    'Category': 'Bitcoin',
+                    'Amount': income,
+                    'Source': transaction['Source']
                 })
 
     return pd.DataFrame(gainloss_ledger), pd.DataFrame(tax_ledger), fifo_queue
@@ -572,8 +594,6 @@ print("\nTotal Tax Entries:", tax_ledger_df.shape[0])
 # Check for any anomalies, like negative remaining amounts
 print("\nAny Negative Remaining Amounts in FIFO Queue?", any(asset['Remaining Amount'] < 0 for asset in fifo_queue_df))
 
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 # Gain/Loss Distribution
 plt.figure(figsize=(10, 6))
@@ -666,7 +686,7 @@ plt.show()
 plt.figure(figsize=(10, 8))
 sns.heatmap(gainloss_ledger_df.corr(), annot=True, cmap='coolwarm')
 plt.title('Correlation Heatmap of Numeric Variables')
-plt.show()
+plt.show()"""
 """
 plt.figure(figsize=(10, 6))
 sns.scatterplot(data=gainloss_ledger_df, x='Sale Proceeds', y='Gain/Loss', hue='holding_period')
@@ -675,4 +695,186 @@ plt.xlabel('Sale Proceeds')
 plt.ylabel('Gain/Loss')
 plt.legend(title='Holding Period')
 plt.show()
+"""
+def calc_8949_holding_period(df):
+    """
+    Prepares the 8949 DataFrame by adding 'Holding Period'.
+    
+    Parameters:
+    - df: DataFrame containing 8949 information with 'Date Sold or Disposed' and 'Date Acquired' columns.
+    
+    Returns:
+    - DataFrame with added 'Holding Period'.
+    """
+    # Ensure 'Date Sold' and 'Date Acquired' are in datetime format
+    df['Date Sold or Disposed'] = pd.to_datetime(df['Date Sold or Disposed'])
+    df['Date Acquired'] = pd.to_datetime(df['Date Acquired'])
+    
+    # Calculate 'holding_period'
+    df['Holding Period'] = df.apply(
+        lambda row: 'Long-term' if (row['Date Sold or Disposed'] - row['Date Acquired']).days > 365 else 'Short-term', axis=1)
+    
+    return df
+
+
+def prepare_form_8949(gainloss_ledger_df, tax_ledger_df):
+    # Rename and select columns for the gain/loss transactions
+    form_8949_sales = gainloss_ledger_df.rename(columns={
+        'Date Acquired': 'Date Acquired',
+        'Date Sold': 'Date Sold or Disposed',
+        'Sale Proceeds': 'Proceeds',
+        'Cost Basis': 'Cost or Other Basis',
+        'Gain/Loss': 'Gain or Loss'
+    })[['Date Acquired', 'Date Sold or Disposed', 'Proceeds', 'Cost or Other Basis', 'Gain or Loss']]
+
+    # Add description column (assuming the property is "Bitcoin" for this example)
+    form_8949_sales['Description of Property'] = 'Bitcoin'
+    form_8949_sales['Source'] = gainloss_ledger_df['Source']
+
+    # Prepare the receive transactions treated as income
+    # This assumes tax_ledger_df includes Date, Type (as "Income"), and Amount columns
+    form_8949_income = tax_ledger_df.rename(columns={
+        'Date': 'Date Acquired',
+        'Amount': 'Proceeds'
+    })[['Date Acquired', 'Proceeds']]
+    form_8949_income['Date Sold or Disposed'] = form_8949_income['Date Acquired']  # Same date for acquired and sold
+    form_8949_income['Cost or Other Basis'] = form_8949_income['Proceeds']  # FMV at time of receipt
+    form_8949_income['Gain or Loss'] = 0  # No gain/loss at the point of receipt
+    form_8949_income['Description of Property'] = 'Bitcoin (Received)'
+    form_8949_income['Source'] = tax_ledger_df['Source']
+
+    # Combine both DataFrames for full 8949 reporting
+    full_form_8949 = pd.concat([form_8949_sales, form_8949_income], ignore_index=True, sort=False).fillna(0)
+
+    # Sort by sale date for chronological order
+    full_form_8949 = full_form_8949.sort_values(by='Date Sold or Disposed')
+
+    # Add holding period information
+    calc_8949_holding_period(full_form_8949)
+    return full_form_8949
+
+# Call the function with your DataFrames
+form_8949_df = prepare_form_8949(gainloss_ledger_df, tax_ledger_df)
+
+# Show the prepared Form 8949 DataFrame
+print(form_8949_df)
+
+row_count = len(form_8949_df)
+
+#8949 diagnostics:
+
+
+sns.histplot(data=form_8949_df, x='Gain or Loss', kde=True, hue='Holding Period', multiple='stack')
+plt.title('Distribution of Gains and Losses on Form 8949')
+plt.xlabel('Gain/Loss ($)')
+plt.ylabel('Count')
+plt.legend(title='Holding Period')
+plt.show()
+
+form_8949_df['Holding Period'].value_counts().plot(kind='pie', autopct='%1.1f%%', startangle=90)
+plt.title('Distribution of Holding Periods in Form 8949')
+plt.ylabel('')  # Hide y-label for clarity
+plt.show()
+
+form_8949_df['Month'] = form_8949_df['Date Sold or Disposed'].dt.to_period('M')
+monthly_gains_losses = form_8949_df.groupby(['Month', 'Holding Period'])['Gain or Loss'].sum().unstack()
+
+monthly_gains_losses.plot(kind='bar', stacked=True, figsize=(12, 6))
+plt.title('Monthly Gains and Losses from Form 8949')
+plt.xlabel('Month')
+plt.ylabel('Gain/Loss ($)')
+plt.xticks(rotation=45)
+plt.legend(title='Holding Period')
+plt.show()
+
+sns.scatterplot(data=form_8949_df, x='Proceeds', y='Gain or Loss', hue='Holding Period')
+plt.title('Sale Proceeds vs. Gain/Loss in Form 8949')
+plt.xlabel('Sale Proceeds ($)')
+plt.ylabel('Gain/Loss ($)')
+plt.legend(title='Holding Period')
+plt.show()
+
+form_8949_df.sort_values('Date Sold or Disposed', inplace=True)
+form_8949_df['Cumulative Gain/Loss'] = form_8949_df['Gain or Loss'].cumsum()
+
+plt.plot(form_8949_df['Date Sold or Disposed'], form_8949_df['Cumulative Gain/Loss'])
+plt.title('Cumulative Gain/Loss from Form 8949')
+plt.xlabel('Date')
+plt.ylabel('Cumulative Gain/Loss ($)')
+plt.xticks(rotation=45)
+plt.show()
+
+
+print(unified_ledger.head())
+print(gainloss_ledger_df.head())
+print(tax_ledger_df.head())
+print(form_8949_df.head())
+
+def prepare_taxslayer_csv(form_8949_df):
+    # Map your form 8949 DataFrame to the TaxSlayer template structure
+    taxslayer_master_df = form_8949_df.rename(columns={
+        'Date Acquired': 'DtAcquired',
+        'Date Sold or Disposed': 'DtSold',
+        'Proceeds': 'SalesPrice',
+        'Cost or Other Basis': 'Cost',
+        'Description of Property': 'Description'
+    })
+    taxslayer_master_df['Owner'] = 'T'  # 'T' for taxpayer
+
+    # Select the necessary columns as per the TaxSlayer template
+    taxslayer_master_df = taxslayer_master_df[[
+        'Owner', 'Description', 'DtAcquired', 'DtSold', 'SalesPrice', 'Cost', 'Source'
+    ]]
+
+    # Now split the DataFrame into separate ones based on the 'Source' column
+    cash_app_21_df = taxslayer_master_df[taxslayer_master_df['Source'] == 'cash_app_21'].drop('Source', axis=1)
+    cash_app_22_df = taxslayer_master_df[taxslayer_master_df['Source'] == 'cash_app_22'].drop('Source', axis=1)
+    fold_app_22_df = taxslayer_master_df[taxslayer_master_df['Source'] == 'fold_app_22'].drop('Source', axis=1)
+    swan_app_22_df = taxslayer_master_df[taxslayer_master_df['Source'] == 'swan_app_22'].drop('Source', axis=1)
+
+    # Return the master DataFrame and the individual source DataFrames
+    return taxslayer_master_df, cash_app_21_df, cash_app_22_df, fold_app_22_df, swan_app_22_df
+
+# Assuming form_8949_df is your DataFrame with all the Form 8949 information
+taxslayer_master_df, cash_app_21_df, cash_app_22_df, fold_app_22_df, swan_app_22_df = prepare_taxslayer_csv(form_8949_df)
+
+# Now, you can save each DataFrame to a CSV file
+taxslayer_master_df.to_csv('taxslayer_master.csv', index=False)
+cash_app_21_df.to_csv('cash_app_21.csv', index=False)
+cash_app_22_df.to_csv('cash_app_22.csv', index=False)
+fold_app_22_df.to_csv('fold_app_22.csv', index=False)
+swan_app_22_df.to_csv('swan_app_22.csv', index=False)
+
+
+# Pie chart for the distribution of transactions across different sources
+taxslayer_master_df['Source'].value_counts().plot(kind='pie', autopct='%1.1f%%', startangle=90)
+plt.title('Distribution of Transactions by Source')
+plt.ylabel('')  # Hide y-label for clarity
+plt.show()
+
+# Histogram for the distribution of sales prices within the 2021 Cash App source
+cash_app_21_df['SalesPrice'].plot(kind='hist', bins=30, alpha=0.7)
+plt.title('Distribution of Sales Prices for Cash App 2021')
+plt.xlabel('Sales Price')
+plt.ylabel('Frequency')
+plt.show()
+
+
+cash_app_21_gl = cash_app_21_df['SalesPrice'] - cash_app_21_df['Cost']
+# Cumulative gain/loss over time for the 2021 Cash App source
+cash_app_21_df['Cumulative Gain/Loss'] = cash_app_21_gl.cumsum()
+cash_app_21_df.sort_values('DtSold', inplace=True)
+plt.plot(cash_app_21_df['DtSold'], cash_app_21_df['Cumulative Gain/Loss'])
+plt.title('Cumulative Gain/Loss for Cash App 2021')
+plt.xlabel('Date')
+plt.ylabel('Cumulative Gain/Loss')
+plt.xticks(rotation=45)
+plt.tight_layout()  # Adjust layout to fit the x-axis labels
+plt.show()
+
+plot_source_distribution(unified_ledger, 'Unified Ledger')
+plot_source_distribution(gainloss_ledger_df, 'Gain/Loss')
+plot_source_distribution(tax_ledger_df, 'Tax/Receive')
+plot_source_distribution(form_8949_df, 'Form 8949')
+plot_source_distribution(taxslayer_master_df, 'TaxSlayer Master')
 
