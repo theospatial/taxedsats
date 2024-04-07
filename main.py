@@ -101,14 +101,21 @@ unified_ledger = unified_ledger.sort_values(by='Date')
 #remove NaN entry (deposit from wallet, accounted for in other wallets)
 unified_ledger = unified_ledger[unified_ledger['Transaction ID'] != 'ukknp3']
 
+
+
 ##categorize transactions into 'buy' 'sale' and 'received' conditions
 def categorize_transaction(row):
-    # Lowercase the transaction type for case-insensitive matching
+    # Explicitly check for transaction IDs to classify as 'Sales'
+    if row['Transaction ID'] == 'a' or row['Transaction ID'] == 'b':
+        return 'Sales'
+
     transaction_type = row['Transaction Type'].lower()
-    
     if 'purchase' in transaction_type or 'buy' in transaction_type:
         return 'Buys'
     if 'sale' in transaction_type:
+        #islhsi
+        #ofqavt
+
         return 'Sales'
     if 'reward' in transaction_type or 'bonus' in transaction_type or 'boost' in transaction_type or 'p2p' in transaction_type:
         return 'Receives'
@@ -119,6 +126,11 @@ def categorize_transaction(row):
 
 unified_ledger['Category'] = unified_ledger.apply(categorize_transaction, axis=1)
 
+
+print(unified_ledger[unified_ledger['Category'] == 'Other']['Notes'].unique())
+print(unified_ledger[unified_ledger['Category'] == 'Other']['Notes'].value_counts())
+print("cash app bitcoin:")
+      
 
 #diagnostics and visualizations:
 print(unified_ledger.head())
@@ -406,6 +418,88 @@ cash_app_22_df.to_csv('cash_app_22.csv', index=False)
 fold_app_22_df.to_csv('fold_app_22.csv', index=False)
 swan_app_22_df.to_csv('swan_app_22.csv', index=False)
 
+# Calculate the split index (if odd number of rows, the first part will have one less row)
+split_index = len(cash_app_22_df) // 2
+
+# Split the DataFrame into two parts
+df_part_1 = cash_app_22_df.iloc[:split_index]
+df_part_2 = cash_app_22_df.iloc[split_index:]
+
+# Save the two parts to new CSV files
+df_part_1.to_csv('~/cash_app_22_part_1.csv', index=False)
+df_part_2.to_csv('~/cash_app_22_part_2.csv', index=False)
+
+print(fifo_queue_df[0])
+print(gainloss_ledger_df.iloc[-1])
+print(tax_ledger_df.iloc[-1])
+"""def save_fifo_queue_to_csv(fifo_queue, filename):
+
+"""
+"""
+    Saves remaining transactions in the FIFO queue to a CSV file.
+    
+    Parameters:
+    - fifo_queue: The FIFO queue containing the transactions.
+    - filename: Name of the CSV file to save the data to.
+    """
+"""
+    # Convert the FIFO queue to a DataFrame
+    df_fifo = pd.DataFrame(fifo_queue)
+    
+    # Ensure the DataFrame is not empty
+    if not df_fifo.empty:
+        # Save to CSV, without the index
+        df_fifo.to_csv(filename, index=False)
+    else:
+        print("The FIFO queue is empty. No CSV file was created.")
+
+save_fifo_queue_to_csv(fifo_queue_df, "transactions22.csv")
+"""
+
+import pandas as pd
+
+def filter_and_update_ledger(fifo_queue, unified_ledger, output_filename=None):
+    """
+    Filters the unified ledger to include only transactions present in the FIFO queue,
+    updates the amount of the first matched transaction with the unspent amount,
+    and optionally saves the result to a CSV file.
+    
+    Parameters:
+    - fifo_queue: List of dictionaries, each representing a FIFO transaction.
+    - unified_ledger: DataFrame containing the full set of transactions.
+    - output_filename: Optional; name of the CSV file to save the filtered ledger.
+    """
+    # Extract Transaction IDs from FIFO queue
+    fifo_transaction_ids = [transaction['Transaction ID'] for transaction in fifo_queue]
+
+    # Filter the unified ledger
+    filtered_ledger = unified_ledger[unified_ledger['Transaction ID'].isin(fifo_transaction_ids)].copy()
+
+    if not filtered_ledger.empty:
+        # Assuming the first transaction in the FIFO queue has the unspent amount
+        unspent_amount = fifo_queue[0]['Remaining Amount']
+        transaction_id_with_unspent = fifo_queue[0]['Transaction ID']
+
+        # Find the index of the transaction in the filtered ledger
+        index_to_update = filtered_ledger.index[filtered_ledger['Transaction ID'] == transaction_id_with_unspent][0]
+
+        # Update the amount in the filtered ledger to reflect the unspent amount
+        filtered_ledger.at[index_to_update, 'Amount'] = unspent_amount
+
+        # Verify the updated transaction (optional)
+        print("Updated Transaction:", filtered_ledger.loc[index_to_update])
+
+        # Save to CSV if an output filename is provided
+        if output_filename:
+            filtered_ledger.to_csv(output_filename, index=False)
+            print(f"Filtered ledger saved to {output_filename}.")
+    else:
+        print("No matching transactions found in the unified ledger.")
+
+# Example usage
+filter_and_update_ledger(fifo_queue_df, unified_ledger, "transactions22.csv")
+
+"""
 plot_source_distribution(unified_ledger, 'Unified Ledger')
 plot_source_distribution(gainloss_ledger_df, 'Gain/Loss')
 plot_source_distribution(tax_ledger_df, 'Tax/Receive')
@@ -482,8 +576,8 @@ plt.title('Distribution of Holding Periods in Form 8949')
 plt.ylabel('')  # Hide y-label for clarity
 plt.show()
 
-form_8949_df['Month'] = form_8949_df['Date Sold or Disposed'].dt.to_period('M')
-monthly_gains_losses = form_8949_df.groupby(['Month', 'Holding Period'])['Gain or Loss'].sum().unstack()
+#form_8949_df['Month'] = form_8949_df['Date Sold or Disposed'].dt.to_period('M')
+#monthly_gains_losses = form_8949_df.groupby(['Month', 'Holding Period'])['Gain or Loss'].sum().unstack()
 
 monthly_gains_losses.plot(kind='bar', stacked=True, figsize=(12, 6))
 plt.title('Monthly Gains and Losses from Form 8949')
@@ -509,3 +603,4 @@ plt.xlabel('Date')
 plt.ylabel('Cumulative Gain/Loss ($)')
 plt.xticks(rotation=45)
 plt.show()
+"""
