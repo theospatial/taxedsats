@@ -106,16 +106,16 @@ unified_ledger = unified_ledger[unified_ledger['Transaction ID'] != 'ukknp3']
 ##categorize transactions into 'buy' 'sale' and 'received' conditions
 def categorize_transaction(row):
     # Explicitly check for transaction IDs to classify as 'Sales'
-    if row['Transaction ID'] == 'a' or row['Transaction ID'] == 'b':
+#    if row['Transaction ID'] == 'islhsi' or row['Transaction ID'] == 'ofqavt':
+#        return 'Sales'
+
+    if row['Transaction ID'] in ['islhsi', 'ofqavt']:  # Explicitly check for 'a' and 'b'
         return 'Sales'
 
     transaction_type = row['Transaction Type'].lower()
     if 'purchase' in transaction_type or 'buy' in transaction_type:
         return 'Buys'
     if 'sale' in transaction_type:
-        #islhsi
-        #ofqavt
-
         return 'Sales'
     if 'reward' in transaction_type or 'bonus' in transaction_type or 'boost' in transaction_type or 'p2p' in transaction_type:
         return 'Receives'
@@ -125,6 +125,12 @@ def categorize_transaction(row):
 
 
 unified_ledger['Category'] = unified_ledger.apply(categorize_transaction, axis=1)
+
+# Assuming your DataFrame is named transactions_df and it includes a column named 'Category'
+# that indicates the type of transaction
+sale_transactions_df = unified_ledger[unified_ledger['Category'] == 'Sales']
+# Save the filtered DataFrame of sale transactions to a CSV file
+sale_transactions_df.to_csv('sale_transactions_2022.csv', index=False)
 
 
 print(unified_ledger[unified_ledger['Category'] == 'Other']['Notes'].unique())
@@ -412,11 +418,11 @@ def prepare_taxslayer_csv(form_8949_df):
 taxslayer_master_df, cash_app_21_df, cash_app_22_df, fold_app_22_df, swan_app_22_df = prepare_taxslayer_csv(form_8949_df)
 
 # Now, you can save each DataFrame to a CSV file
-taxslayer_master_df.to_csv('taxslayer_master.csv', index=False)
-cash_app_21_df.to_csv('cash_app_21.csv', index=False)
-cash_app_22_df.to_csv('cash_app_22.csv', index=False)
-fold_app_22_df.to_csv('fold_app_22.csv', index=False)
-swan_app_22_df.to_csv('swan_app_22.csv', index=False)
+taxslayer_master_df.to_csv('taxslayer_master_for_2022.csv', index=False)
+cash_app_21_df.to_csv('cash_app_21_for_2022.csv', index=False)
+cash_app_22_df.to_csv('cash_app_22_for_2022.csv', index=False)
+fold_app_22_df.to_csv('fold_app_22_for_2022.csv', index=False)
+swan_app_22_df.to_csv('swan_app_22_for_2022.csv', index=False)
 
 # Calculate the split index (if odd number of rows, the first part will have one less row)
 split_index = len(cash_app_22_df) // 2
@@ -426,8 +432,8 @@ df_part_1 = cash_app_22_df.iloc[:split_index]
 df_part_2 = cash_app_22_df.iloc[split_index:]
 
 # Save the two parts to new CSV files
-df_part_1.to_csv('~/cash_app_22_part_1.csv', index=False)
-df_part_2.to_csv('~/cash_app_22_part_2.csv', index=False)
+df_part_1.to_csv('~/cash_app_22_for_2022_part_1.csv', index=False)
+df_part_2.to_csv('~/cash_app_22_for_2022_part_2.csv', index=False)
 
 print(fifo_queue_df[0])
 print(gainloss_ledger_df.iloc[-1])
@@ -456,8 +462,6 @@ print(tax_ledger_df.iloc[-1])
 save_fifo_queue_to_csv(fifo_queue_df, "transactions22.csv")
 """
 
-import pandas as pd
-
 def filter_and_update_ledger(fifo_queue, unified_ledger, output_filename=None):
     """
     Filters the unified ledger to include only transactions present in the FIFO queue,
@@ -484,7 +488,16 @@ def filter_and_update_ledger(fifo_queue, unified_ledger, output_filename=None):
         index_to_update = filtered_ledger.index[filtered_ledger['Transaction ID'] == transaction_id_with_unspent][0]
 
         # Update the amount in the filtered ledger to reflect the unspent amount
-        filtered_ledger.at[index_to_update, 'Amount'] = unspent_amount
+        filtered_ledger.at[index_to_update, 'Asset Amount'] = unspent_amount
+
+        # Modify 'Description of Property' from 'Bitcoin (Received)' to 'Bitcoin'
+        filtered_ledger['Transaction Type'] = filtered_ledger['Transaction Type'].replace({'Bitcoin Boost': 'bitcoin hold'})
+        filtered_ledger['Transaction Type'] = filtered_ledger['Transaction Type'].replace({'Bitcoin Buy': 'bitcoin hold'})
+        filtered_ledger['Transaction Type'] = filtered_ledger['Transaction Type'].replace({'purchase': 'bitcoin hold'})
+        filtered_ledger['Transaction Type'] = filtered_ledger['Transaction Type'].replace({'reward': 'bitcoin hold'})
+
+        # Remove 'Source', 'Year', 'Category' columns
+        filtered_ledger = filtered_ledger.drop(columns=['Source', 'Year', 'Category'])
 
         # Verify the updated transaction (optional)
         print("Updated Transaction:", filtered_ledger.loc[index_to_update])
@@ -499,7 +512,12 @@ def filter_and_update_ledger(fifo_queue, unified_ledger, output_filename=None):
 # Example usage
 filter_and_update_ledger(fifo_queue_df, unified_ledger, "transactions22.csv")
 
-"""
+# Save gainloss_ledger to CSV
+gainloss_ledger_df.to_csv('gainloss_ledger_2022.csv', index=False)
+
+# Save tax_ledger to CSV
+tax_ledger_df.to_csv('tax_ledger_2022.csv', index=False)
+
 plot_source_distribution(unified_ledger, 'Unified Ledger')
 plot_source_distribution(gainloss_ledger_df, 'Gain/Loss')
 plot_source_distribution(tax_ledger_df, 'Tax/Receive')
@@ -603,4 +621,3 @@ plt.xlabel('Date')
 plt.ylabel('Cumulative Gain/Loss ($)')
 plt.xticks(rotation=45)
 plt.show()
-"""
